@@ -111,92 +111,76 @@ stateDiagram-v2
 # Diagrama de Estados
 ```mermaid
 sequenceDiagram
+    autonumber
+    
     actor Usuario
-    participant Main as Main<br/>(Inicialización)
-    participant UI as UIController<br/>(Interfaz)
-    participant Parser as DiceParser<br/>(Análisis)
-    participant Valid as Validator<br/>(Validación)
-    participant Roller as DiceRoller<br/>(Generador)
-    participant Result as DiceResult<br/>(Resultado)
+    participant Main as Main
+    participant UI as UIController
+    participant Input as DiceInput
+    participant Parser as DiceParser
+    participant Valid as Validator
+    participant Roller as DiceRoller
+    participant Result as DiceResult
+    participant Display as ResultDisplay
     
-    rect rgb(230, 240, 255)
-        Note over Usuario,Result: FASE 1: INICIALIZACIÓN
-        Usuario->>Main: Cargar página
-        activate Main
-        Main->>Main: document.getElementById('diceInput')
-        Main->>Main: document.getElementById('results')
-        Main->>UI: setupEventListeners()
-        activate UI
-        UI->>UI: addEventListener('click')
-        UI->>UI: addEventListener('keypress')
-        UI-->>Main: listeners configurados
-        deactivate UI
-        deactivate Main
-    end
+    Usuario->>Main: Cargar página
+    Main->>UI: initialize()
+    UI->>UI: setupEventListeners()
     
-    rect rgb(255, 245, 230)
-        Note over Usuario,Result: FASE 2: CAPTURA DE ENTRADA
-        Usuario->>UI: Escribir "2d6+3"
-        Note over Usuario,UI: Usuario ingresa fórmula
-        Usuario->>UI: Presionar Enter / Click LANZAR
-        activate UI
-    end
+    Usuario->>Input: Escribir fórmula
+    Input-->>Usuario: fórmula capturada
     
-    rect rgb(230, 255, 240)
-        Note over Usuario,Result: FASE 3: VALIDACIÓN Y PARSING
-        UI->>UI: rollDice()
-        UI->>Parser: parseDiceFormula("2d6+3")
-        activate Parser
-        
-        Parser->>Parser: formula.toLowerCase()
-        Parser->>Parser: match regex
-        
-        Parser->>Valid: validateDiceCount(2)
-        activate Valid
-        Valid-->>Parser: ✓ válido
-        deactivate Valid
-        
-        Parser->>Valid: validateDiceSides(6)
-        activate Valid
-        Valid-->>Parser: ✓ válido
-        deactivate Valid
-    end
+    Usuario->>UI: Click LANZAR
+    UI->>Input: obtenerValor()
+    Input-->>UI: formula
     
-    rect rgb(255, 240, 245)
-        Note over Usuario,Result: FASE 4: GENERACIÓN
-        Parser->>Roller: roll(2, 6)
-        activate Roller
+    alt formula vacía
+        UI->>Display: mostrarError("Por favor, introduce una fórmula de dados")
+    else formula no vacía
+        UI->>Parser: parseDiceFormula(formula)
+        Parser->>Parser: limpiarFormula()
+        Parser->>Parser: aplicarRegex()
         
-        loop i = 0 to 1
-            Roller->>Roller: random(1, 6)
-            Note over Roller: Dado 1: 3<br/>Dado 2: 5
+        alt formato inválido
+            Parser--xUI: Error("Formato inválido. Usa el formato: XdY+Z")
+            UI->>Display: mostrarError("Formato inválido. Usa el formato: XdY+Z")
+        else formato válido
+            Parser->>Parser: extraerComponentes(numDice, diceSides, modifier)
+            
+            Parser->>Valid: validateDiceCount(numDice)
+            alt numDice < 1 o numDice > 100
+                Valid--xParser: Error("El número de dados debe estar entre 1 y 100")
+                Parser--xUI: propagar error
+                UI->>Display: mostrarError("El número de dados debe estar entre 1 y 100")
+            else numDice válido
+                Valid-->>Parser: OK
+                
+                Parser->>Valid: validateDiceSides(diceSides)
+                alt diceSides < 2 o diceSides > 1000
+                    Valid--xParser: Error("Los dados deben tener entre 2 y 1000 caras")
+                    Parser--xUI: propagar error
+                    UI->>Display: mostrarError("Los dados deben tener entre 2 y 1000 caras")
+                else diceSides válido
+                    Valid-->>Parser: OK
+                    
+                    Parser->>Roller: roll(numDice, diceSides)
+                    Roller->>Roller: generarNumerosAleatorios()
+                    Roller-->>Parser: rolls[]
+                    
+                    Parser->>Parser: calcularSuma(rolls)
+                    Parser->>Parser: aplicarModificador(suma, modifier)
+                    
+                    Parser->>Result: new DiceResult(formula, rolls, modifier, suma, total)
+                    Result-->>Parser: instancia creada
+                    
+                    Parser-->>UI: resultado
+                    
+                    opt resultado calculado correctamente
+                        UI->>Display: displayResult(resultado)
+                        Display->>Usuario: Mostrar resultado
+                    end
+                end
+            end
         end
-        
-        Roller-->>Parser: [3, 5]
-        deactivate Roller
-    end
-    
-    rect rgb(240, 255, 240)
-        Note over Usuario,Result: FASE 5: CÁLCULO
-        Parser->>Parser: sum = 3 + 5 = 8
-        Parser->>Parser: total = 8 + 3 = 11
-        
-        Parser->>Result: new DiceResult(...)
-        activate Result
-        Note over Result: formula: "2D6+3"<br/>rolls: [3, 5]<br/>modifier: 3<br/>sum: 8<br/>total: 11
-        Result-->>Parser: instancia
-        deactivate Result
-        
-        Parser-->>UI: return result
-        deactivate Parser
-    end
-    
-    rect rgb(245, 240, 255)
-        Note over Usuario,Result: FASE 6: VISUALIZACIÓN
-        UI->>UI: displayResult(result)
-        UI->>UI: generar HTML
-        UI->>Usuario: insertar en DOM
-        Note over Usuario,UI: 🎲 2D6+3<br/>[3] [5]<br/>Suma: 8 + 3<br/>Total: 11
-        deactivate UI
     end
 ```
