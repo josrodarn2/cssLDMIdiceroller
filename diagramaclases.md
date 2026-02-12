@@ -110,86 +110,93 @@ stateDiagram-v2
 ```
 # Diagrama de Estados
 ```mermaid
-stateDiagram-v2
-    [*] --> Inicializando
+sequenceDiagram
+    actor Usuario
+    participant Main as Main<br/>(Inicialización)
+    participant UI as UIController<br/>(Interfaz)
+    participant Parser as DiceParser<br/>(Análisis)
+    participant Valid as Validator<br/>(Validación)
+    participant Roller as DiceRoller<br/>(Generador)
+    participant Result as DiceResult<br/>(Resultado)
     
-    Inicializando --> EsperandoEntrada : página cargada<br/>listeners configurados
+    rect rgb(230, 240, 255)
+        Note over Usuario,Result: FASE 1: INICIALIZACIÓN
+        Usuario->>Main: Cargar página
+        activate Main
+        Main->>Main: document.getElementById('diceInput')
+        Main->>Main: document.getElementById('results')
+        Main->>UI: setupEventListeners()
+        activate UI
+        UI->>UI: addEventListener('click')
+        UI->>UI: addEventListener('keypress')
+        UI-->>Main: listeners configurados
+        deactivate UI
+        deactivate Main
+    end
     
-    EsperandoEntrada --> CapturandoFormula : usuario escribe<br/>en input
-    EsperandoEntrada --> SeleccionBotonRapido : click en botón<br/>rápido (1d6, 1d20...)
-    EsperandoEntrada --> LanzandoMoneda : click en botón<br/>MONEDA
+    rect rgb(255, 245, 230)
+        Note over Usuario,Result: FASE 2: CAPTURA DE ENTRADA
+        Usuario->>UI: Escribir "2d6+3"
+        Note over Usuario,UI: Usuario ingresa fórmula
+        Usuario->>UI: Presionar Enter / Click LANZAR
+        activate UI
+    end
     
-    CapturandoFormula --> ValidandoEntrada : presiona LANZAR<br/>o tecla Enter
-    SeleccionBotonRapido --> ValidandoEntrada : fórmula<br/>auto-establecida
+    rect rgb(230, 255, 240)
+        Note over Usuario,Result: FASE 3: VALIDACIÓN Y PARSING
+        UI->>UI: rollDice()
+        UI->>Parser: parseDiceFormula("2d6+3")
+        activate Parser
+        
+        Parser->>Parser: formula.toLowerCase()
+        Parser->>Parser: match regex
+        
+        Parser->>Valid: validateDiceCount(2)
+        activate Valid
+        Valid-->>Parser: ✓ válido
+        deactivate Valid
+        
+        Parser->>Valid: validateDiceSides(6)
+        activate Valid
+        Valid-->>Parser: ✓ válido
+        deactivate Valid
+    end
     
-    ValidandoEntrada --> ErrorEntradaVacia : input vacío
-    ValidandoEntrada --> ParseandoFormula : input no vacío
+    rect rgb(255, 240, 245)
+        Note over Usuario,Result: FASE 4: GENERACIÓN
+        Parser->>Roller: roll(2, 6)
+        activate Roller
+        
+        loop i = 0 to 1
+            Roller->>Roller: random(1, 6)
+            Note over Roller: Dado 1: 3<br/>Dado 2: 5
+        end
+        
+        Roller-->>Parser: [3, 5]
+        deactivate Roller
+    end
     
-    ParseandoFormula --> ErrorFormatoInvalido : formato incorrecto<br/>(regex no coincide)
-    ParseandoFormula --> ExtrayendoComponentes : formato válido<br/>(XdY+Z)
+    rect rgb(240, 255, 240)
+        Note over Usuario,Result: FASE 5: CÁLCULO
+        Parser->>Parser: sum = 3 + 5 = 8
+        Parser->>Parser: total = 8 + 3 = 11
+        
+        Parser->>Result: new DiceResult(...)
+        activate Result
+        Note over Result: formula: "2D6+3"<br/>rolls: [3, 5]<br/>modifier: 3<br/>sum: 8<br/>total: 11
+        Result-->>Parser: instancia
+        deactivate Result
+        
+        Parser-->>UI: return result
+        deactivate Parser
+    end
     
-    ExtrayendoComponentes --> ValidandoNumDados : componentes<br/>extraídos
-    
-    ValidandoNumDados --> ErrorRangoDados : numDice < 1<br/>o > 100
-    ValidandoNumDados --> ValidandoCarasDado : numDice OK<br/>(1-100)
-    
-    ValidandoCarasDado --> ErrorRangoCaras : diceSides < 2<br/>o > 1000
-    ValidandoCarasDado --> GenerandoNumeros : diceSides OK<br/>(2-1000)
-    
-    GenerandoNumeros --> CalculandoSuma : todos los dados<br/>lanzados
-    
-    CalculandoSuma --> AplicandoModificador : suma calculada
-    
-    AplicandoModificador --> CreandoResultado : total calculado
-    
-    CreandoResultado --> MostrandoResultado : objeto DiceResult<br/>creado
-    
-    LanzandoMoneda --> GenerandoAleatorioMoneda : ejecutando<br/>flipCoin()
-    
-    GenerandoAleatorioMoneda --> DeterminandoCara : random < 0.5
-    GenerandoAleatorioMoneda --> DeterminandoCruz : random >= 0.5
-    
-    DeterminandoCara --> MostrandoResultadoMoneda : CARA 🪙
-    DeterminandoCruz --> MostrandoResultadoMoneda : CRUZ ⚫
-    
-    ErrorEntradaVacia --> MostrandoError : mensaje:<br/>"Introduce una fórmula"
-    ErrorFormatoInvalido --> MostrandoError : mensaje:<br/>"Formato inválido"
-    ErrorRangoDados --> MostrandoError : mensaje:<br/>"1-100 dados"
-    ErrorRangoCaras --> MostrandoError : mensaje:<br/>"2-1000 caras"
-    
-    MostrandoError --> EsperandoEntrada : error mostrado<br/>sistema listo
-    MostrandoResultado --> EsperandoEntrada : resultado mostrado<br/>historial actualizado
-    MostrandoResultadoMoneda --> EsperandoEntrada : resultado mostrado<br/>historial actualizado
-    
-    EsperandoEntrada --> [*] : usuario cierra<br/>página
-    
-    note right of Inicializando
-        - Cargar DOM
-        - Crear referencias
-        - Configurar eventos
-    end note
-    
-    note right of ValidandoEntrada
-        Verifica que el input
-        no esté vacío antes
-        de procesar
-    end note
-    
-    note right of ParseandoFormula
-        Regex: /^(\d+)d(\d+)([\+\-]\d+)?$/
-        Ejemplo: 2d6+3
-    end note
-    
-    note right of GenerandoNumeros
-        Loop: para cada dado
-        Math.floor(Math.random() * sides) + 1
-    end note
-    
-    note right of MostrandoResultado
-        HTML generado:
-        - Fórmula
-        - Dados individuales
-        - Modificador (si existe)
-        - Total final
-    end note
+    rect rgb(245, 240, 255)
+        Note over Usuario,Result: FASE 6: VISUALIZACIÓN
+        UI->>UI: displayResult(result)
+        UI->>UI: generar HTML
+        UI->>Usuario: insertar en DOM
+        Note over Usuario,UI: 🎲 2D6+3<br/>[3] [5]<br/>Suma: 8 + 3<br/>Total: 11
+        deactivate UI
+    end
 ```
