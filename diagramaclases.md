@@ -81,3 +81,30 @@ note for DiceRollerApp "Punto de entrada de la aplicación\nInicializa component
 note for DiceParser "Analiza fórmulas tipo: XdY+Z\nEjemplo: 2d6+3"
 note for Validator "Límites: 1-100 dados\n2-1000 caras por dado"
 ```
+
+# diagrama de secuencia
+```mermaid
+stateDiagram-v2
+    [*] --> Inicial
+    
+    Inicial --> EsperandoEntrada : página cargada
+    EsperandoEntrada --> ValidandoFormula : usuario ingresa fórmula
+    EsperandoEntrada --> LanzandoMoneda : click en MONEDA
+    
+    ValidandoFormula --> ErrorFormato : formato inválido
+    ValidandoFormula --> ValidandoRestricciones : formato válido
+    
+    ValidandoRestricciones --> ErrorRango : fuera de límites
+    ValidandoRestricciones --> GenerandoDados : restricciones OK
+    
+    GenerandoDados --> CalculandoResultado : dados lanzados
+    CalculandoResultado --> MostrandoResultado : cálculo completado
+    
+    LanzandoMoneda --> MostrandoResultado : cara o cruz
+    
+    ErrorFormato --> EsperandoEntrada : error mostrado
+    ErrorRango --> EsperandoEntrada : error mostrado
+    MostrandoResultado --> EsperandoEntrada : resultado mostrado
+    
+    EsperandoEntrada --> [*] : usuario cierra página
+```
